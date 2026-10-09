@@ -29,7 +29,7 @@ function downloadCsv(leads: Lead[]) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "vidyaconnect-leads.csv";
+  link.download = "originbi-leads.csv";
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -37,7 +37,6 @@ function downloadCsv(leads: Lead[]) {
 export function AdminDesk() {
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
-  const [usingDefaultCode, setUsingDefaultCode] = useState(true);
   const [code, setCode] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
@@ -72,7 +71,6 @@ export function AdminDesk() {
       .then((gate) => {
         if (cancel) return;
         setSignedIn(gate.signedIn);
-        setUsingDefaultCode(gate.usingDefaultCode);
       })
       .catch(() => {
         if (!cancel) setLoadError("Couldn't open the booth desk.");
@@ -167,7 +165,7 @@ export function AdminDesk() {
       <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-4 py-10">
         <OriginLogo className="h-10 w-auto object-contain object-left" />
         <p className="mt-5 text-xs tracking-widest text-subtle uppercase">Booth desk</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">VidyaConnect</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">OriginBI</h1>
         <p className="mt-2 text-sm text-muted">Live queue for the people running the booth.</p>
         <form className="mt-6 flex flex-col gap-3" onSubmit={(event) => void onLogin(event)}>
           <label className="flex flex-col gap-2 text-sm font-medium">
@@ -180,9 +178,6 @@ export function AdminDesk() {
               required
             />
           </label>
-          {usingDefaultCode ? (
-            <p className="text-sm text-subtle">Preview code is summit-floor. Change it after you enter.</p>
-          ) : null}
           {loginError ? <p className="text-sm text-danger">{loginError}</p> : null}
           <Button size="lg" type="submit" disabled={loginBusy}>
             {loginBusy ? <Loader2 className="size-4 animate-spin" /> : null}
@@ -323,7 +318,7 @@ export function AdminDesk() {
 
       <section className="mt-10 max-w-sm border-t border-border pt-6">
         <h2 className="text-sm font-medium">Change access code</h2>
-        <p className="mt-1 text-sm text-subtle">Replaces the preview code for this desk.</p>
+        <p className="mt-1 text-sm text-subtle">Replaces the current access code.</p>
         <form
           className="mt-3 flex flex-col gap-3"
           onSubmit={(event) => {
@@ -333,7 +328,6 @@ export function AdminDesk() {
                 setCodeMessage(result.error);
                 return;
               }
-              setUsingDefaultCode(false);
               setNextCode("");
               setCodeMessage("Access code updated.");
             });

@@ -18,7 +18,6 @@ export function CapturePage({ initialMode }: { initialMode: Mode }) {
         <header className="flex items-center justify-between gap-3 px-4 pt-5 pb-3">
           <div className="min-w-0">
             <OriginLogo className="h-10 w-auto max-w-full object-contain object-left" />
-            <p className="mt-1 text-xs font-medium tracking-wide text-muted">VidyaConnect</p>
           </div>
           <Link to="/admin" className="shrink-0 text-sm font-medium text-fg">
             Desk

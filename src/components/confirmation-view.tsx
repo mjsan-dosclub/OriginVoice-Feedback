@@ -124,7 +124,7 @@ export function ConfirmationView({ id, token }: { id: string; token: string }) {
             <Field label="Institution">
               <Input value={schoolName} onChange={(event) => setSchoolName(event.target.value)} autoComplete="organization" />
             </Field>
-            <Field label="Email" hint="Optional. A thank-you note is sent when email delivery is connected.">
+            <Field label="Email" hint="Optional.">
               <Input
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}

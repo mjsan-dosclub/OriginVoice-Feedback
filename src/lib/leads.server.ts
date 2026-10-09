@@ -12,6 +12,7 @@ import {
   isSlot,
   normalizeParsed,
   parseBullets,
+  recoverDoubledSpeech,
   thankYouEmailHtml,
   todayIso,
   type Lead,
@@ -165,7 +166,7 @@ async function sendThankYou(lead: Lead) {
   const apiKey = env("RESEND_API_KEY");
   if (!lead.email) return { emailSent: false as const, emailState: "none" as const };
   if (!apiKey) return { emailSent: false as const, emailState: "skipped" as const };
-  const from = env("RESEND_FROM") || "VidyaConnect <onboarding@resend.dev>";
+  const from = env("RESEND_FROM") || "OriginBI <onboarding@resend.dev>";
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -176,7 +177,7 @@ async function sendThankYou(lead: Lead) {
       body: JSON.stringify({
         from,
         to: [lead.email],
-        subject: lead.name ? `Thank you, ${lead.name} — VidyaConnect` : "Thank you — VidyaConnect",
+        subject: lead.name ? `Thank you, ${lead.name} — OriginBI` : "Thank you — OriginBI",
         html: thankYouEmailHtml({
           name: lead.name,
           phone: lead.phone,
@@ -226,10 +227,11 @@ async function callGrok(transcript: string, withSchema: boolean) {
         {
           role: "system",
           content:
-            "The transcript may be Tamil script, English, or Tamil mixed with English. Keep the person's name and institution as spoken. " +
-            "Resolve spoken numbers: double nine = 99, triple eight = 888, oh = 0. " +
+            "Most visitors speak Indian English. Some speak Tamil, or English and Tamil in the same sentence. English may be written in Tamil letters (ராஜ் = Raj, மை நம்பர் இஸ் = my number is, பிளஸ் = plus). Keep the person's name and institution as spoken. " +
+            "If the same phrase is pasted again and again, keep one copy. " +
+            "Resolve spoken numbers in English or Tamil: double nine = 99, triple eight = 888, oh = 0, ஒன்பது = 9, எட்டு = 8, பூஜ்யம் = 0. " +
             "Return JSON only with keys name, phone, school_name, requirements_summary, detected_objective. " +
-            "phone is a 10-digit Indian mobile with no country code, or an empty string. " +
+            "phone is a 10-digit Indian mobile with no country code. If the digit hint is 10 digits, use it as phone. Never leave phone empty when a mobile is spoken. " +
             "school_name is the institution they name — a school, college, campus, or organisation — or null. Visitors may say institution instead of school. requirements_summary is 1 to 4 short sentences of the real requirement, never a single noun and never invented. " +
             'detected_objective is exactly one of "Demo", "Know More", "Catch-up Call". ' +
             "Demo means they want a product demonstration. Catch-up Call means a callback or meeting. Otherwise Know More. " +
@@ -278,8 +280,50 @@ async function parseTranscript(transcript: string) {
   }
 }
 
+export async function transcribeBoothAudio(input: { audioBase64: string; mime: string }) {
+  const apiKey = env("XAI_API_KEY");
+  if (!apiKey) {
+    return { ok: false as const, error: "Voice reading is unavailable. Type the note, or use the form." };
+  }
+  if (limited(`ai:${clientIp()}`, 200, 60 * 60 * 1000)) {
+    return { ok: false as const, error: "Voice reading is paused for this phone. Use the form, or try later." };
+  }
+  const mime = (input.mime.split(";")[0] || "audio/webm").toLowerCase();
+  const allowed = ["audio/webm", "audio/mp4", "audio/mpeg", "audio/wav", "audio/ogg", "audio/aac", "audio/x-m4a", "video/mp4"];
+  if (!allowed.includes(mime)) {
+    return { ok: false as const, error: "This phone's recording could not be read. Type the note instead." };
+  }
+  let bytes: Buffer;
+  try {
+    bytes = Buffer.from(input.audioBase64, "base64");
+  } catch {
+    return { ok: false as const, error: "This recording could not be read. Try again." };
+  }
+  if (bytes.length < 800) return { ok: false as const, error: "That recording was too short. Try again." };
+  if (bytes.length > 6_000_000) return { ok: false as const, error: "That recording is too long. Try a shorter note." };
+
+  const ext = mime.includes("mp4") || mime.includes("m4a") ? "m4a" : mime.includes("wav") ? "wav" : "webm";
+  const form = new FormData();
+  form.append("model", "grok-voice-transcribe-2.0");
+  form.append("file", new File([new Uint8Array(bytes)], `booth.${ext}`, { type: mime }));
+  try {
+    const res = await fetch("https://api.x.ai/v1/stt", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
+    if (!res.ok) return { ok: false as const, error: "Couldn't hear that clearly. Type the note, or use the form." };
+    const body = (await res.json()) as { text?: string };
+    const text = recoverDoubledSpeech((body.text ?? "").trim());
+    if (text.length < 2) return { ok: false as const, error: "Couldn't hear that clearly. Type the note, or use the form." };
+    return { ok: true as const, text };
+  } catch {
+    return { ok: false as const, error: "Couldn't reach voice reading. Type the note, or use the form." };
+  }
+}
+
 export async function processVoiceLead(input: { transcript: string; clientKey: string }) {
-  const transcript = input.transcript.trim();
+  const transcript = recoverDoubledSpeech(input.transcript.trim());
   if (transcript.length < 4) {
     return { ok: false as const, error: "Add a few words before processing." };
   }
@@ -287,10 +331,10 @@ export async function processVoiceLead(input: { transcript: string; clientKey: s
     return { ok: false as const, error: "Could not start this capture. Reload and try again." };
   }
   const ip = clientIp();
-  if (limited(`lead:${ip}`, 40, 60 * 60 * 1000)) {
+  if (limited(`lead:${ip}`, 400, 60 * 60 * 1000)) {
     return { ok: false as const, error: "This phone has sent a lot of notes. Try again in a little while." };
   }
-  if (limited(`ai:${ip}`, 20, 60 * 60 * 1000)) {
+  if (limited(`ai:${ip}`, 200, 60 * 60 * 1000)) {
     return { ok: false as const, error: "Voice reading is paused for this phone. Use the form, or try later." };
   }
 
@@ -413,7 +457,7 @@ export async function submitManualLead(input: {
   if (!validClientKey(input.clientKey)) {
     return { ok: false as const, error: "Could not start this form. Reload and try again." };
   }
-  if (limited(`lead:${clientIp()}`, 40, 60 * 60 * 1000)) {
+  if (limited(`lead:${clientIp()}`, 400, 60 * 60 * 1000)) {
     return { ok: false as const, error: "This phone has sent a lot of notes. Try again in a little while." };
   }
   const name = cleanName(input.name);

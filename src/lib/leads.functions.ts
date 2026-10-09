@@ -62,6 +62,19 @@ export const confirmVoice = createServerFn({ method: "POST" })
     return confirmLead(data);
   });
 
+export const transcribeBooth = createServerFn({ method: "POST" })
+  .validator((input: { audioBase64: string; mime: string }) => {
+    const data = record(input);
+    return {
+      audioBase64: text(data.audioBase64, 8_000_000),
+      mime: text(data.mime, 80),
+    };
+  })
+  .handler(async ({ data }) => {
+    const { transcribeBoothAudio } = await import("./leads.server");
+    return transcribeBoothAudio(data);
+  });
+
 export const submitManual = createServerFn({ method: "POST" })
   .validator(
     (input: {

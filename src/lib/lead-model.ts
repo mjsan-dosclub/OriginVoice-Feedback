@@ -40,6 +40,7 @@ const WORD_DIGIT: Record<string, string> = {
   oh: "0",
   o: "0",
   nought: "0",
+  naught: "0",
   one: "1",
   two: "2",
   three: "3",
@@ -49,19 +50,72 @@ const WORD_DIGIT: Record<string, string> = {
   seven: "7",
   eight: "8",
   nine: "9",
+  பூஜ்யம்: "0",
+  பூஜ்ஜியம்: "0",
+  பூஜியம்: "0",
+  சூன்யம்: "0",
+  சூன்னியம்: "0",
+  ஜீரோ: "0",
+  சீரோ: "0",
+  ஒன்று: "1",
+  ஒன்னு: "1",
+  ஒன்: "1",
+  இரண்டு: "2",
+  இரெண்டு: "2",
+  ரெண்டு: "2",
+  டூ: "2",
+  மூன்று: "3",
+  மூணு: "3",
+  த்ரீ: "3",
+  நான்கு: "4",
+  நாலு: "4",
+  நால்கு: "4",
+  ஐந்து: "5",
+  அஞ்சு: "5",
+  ஆறு: "6",
+  ஆரு: "6",
+  ஏழு: "7",
+  எட்டு: "8",
+  எய்ட்: "8",
+  ஒன்பது: "9",
+  ஒம்பது: "9",
+  ஒன்போது: "9",
+  நைன்: "9",
 };
 
 const REPEAT: Record<string, number> = {
   double: 2,
   triple: 3,
   quadruple: 4,
+  டபிள்: 2,
+  டபுள்: 2,
+  டபுல்: 2,
+  இரட்டை: 2,
+  டிரிபிள்: 3,
+  டிரிபில்: 3,
 };
 
+const TAMIL_NUMERALS = "௦௧௨௩௪௫௬௭௮௯";
+
+function asDigits(token: string): string | null {
+  const word = WORD_DIGIT[token];
+  if (word) return word;
+  if (/^[௦-௯]+$/.test(token)) {
+    return [...token].map((ch) => String(TAMIL_NUMERALS.indexOf(ch))).join("");
+  }
+  if (/^\d+$/.test(token)) return token;
+  return null;
+}
+
+function nationalMobile(digits: string): string {
+  let next = digits;
+  if (next.startsWith("91") && next.length >= 12) next = next.slice(2);
+  if (next.startsWith("0") && next.length === 11) next = next.slice(1);
+  return /^[6-9]\d{9}$/.test(next) ? next : "";
+}
+
 export function cleanPhone(input: string): string {
-  let digits = input.replace(/\D/g, "");
-  if (digits.startsWith("91") && digits.length === 12) digits = digits.slice(2);
-  if (digits.startsWith("0") && digits.length === 11) digits = digits.slice(1);
-  return /^[6-9]\d{9}$/.test(digits) ? digits : "";
+  return nationalMobile(input.replace(/\D/g, ""));
 }
 
 export function formatPhone(digits: string): string {
@@ -71,39 +125,47 @@ export function formatPhone(digits: string): string {
 }
 
 export function extractIndianMobile(transcript: string): string {
-  const tokens = transcript
+  const rough = transcript
+    .normalize("NFKC")
     .toLowerCase()
-    .replace(/[^a-z0-9+]+/g, " ")
+    .replace(/[^\p{L}\p{M}\p{N}+]+/gu, " ")
     .trim()
     .split(/\s+/)
     .filter(Boolean);
+  const tokens: string[] = [];
+  for (const token of rough) {
+    const parts = token.match(/\d+|[௦-௯]+|[\p{L}\p{M}]+/gu);
+    tokens.push(...(parts ?? [token]));
+  }
 
   let stream = "";
+  const currentRun = () => {
+    const space = stream.lastIndexOf(" ");
+    return space === -1 ? stream : stream.slice(space + 1);
+  };
+  const pushDigits = (digits: string) => {
+    const current = currentRun();
+    if (nationalMobile(current) && current.length <= 12 && digits.length <= 2) stream += " ";
+    stream += digits;
+  };
+
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i] ?? "";
     const repeat = REPEAT[token];
     if (repeat) {
       const next = tokens[i + 1];
-      const digit = next ? WORD_DIGIT[next] : undefined;
-      if (digit) {
-        stream += digit.repeat(repeat);
-        i += 1;
-        continue;
-      }
-      if (next && /^\d$/.test(next)) {
-        stream += next.repeat(repeat);
+      const digit = next ? asDigits(next) : null;
+      if (digit && digit.length === 1) {
+        pushDigits(digit.repeat(repeat));
         i += 1;
         continue;
       }
       stream += " ";
       continue;
     }
-    if (WORD_DIGIT[token]) {
-      stream += WORD_DIGIT[token];
-      continue;
-    }
-    if (/^\d+$/.test(token)) {
-      stream += token;
+    const digits = asDigits(token);
+    if (digits) {
+      pushDigits(digits);
       continue;
     }
     stream += " ";
@@ -111,18 +173,59 @@ export function extractIndianMobile(transcript: string): string {
 
   const candidates: string[] = [];
   for (const run of stream.split(/\s+/).filter(Boolean)) {
-    let digits = run;
-    if (digits.startsWith("91") && digits.length >= 12) digits = digits.slice(2);
-    if (digits.startsWith("0") && digits.length === 11) digits = digits.slice(1);
-    if (/^[6-9]\d{9}$/.test(digits)) candidates.push(digits);
-    if (digits.length > 10) {
-      for (let i = 0; i <= digits.length - 10; i += 1) {
-        const slice = digits.slice(i, i + 10);
-        if (/^[6-9]\d{9}$/.test(slice)) candidates.push(slice);
+    const exact = nationalMobile(run);
+    if (exact && run.length <= 13) {
+      candidates.push(exact);
+      continue;
+    }
+    if (run.length > 13) {
+      for (let i = 0; i <= run.length - 10; i += 1) {
+        const slice = run.slice(i, i + 10);
+        if (/^[6-9]\d{9}$/.test(slice)) {
+          candidates.push(slice);
+          break;
+        }
       }
     }
   }
   return candidates.at(-1) ?? "";
+}
+
+/** Chrome sometimes pastes each longer guess onto the last one. Keep one copy. */
+export function recoverDoubledSpeech(text: string): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length < 4) return words.join(" ");
+  const canExplain = (hypothesis: string[]) => {
+    let index = 0;
+    let chunks = 0;
+    while (index < words.length) {
+      let took = 0;
+      const room = Math.min(hypothesis.length, words.length - index);
+      for (let size = room; size >= 1; size -= 1) {
+        let same = true;
+        for (let k = 0; k < size; k += 1) {
+          if (words[index + k] !== hypothesis[k]) {
+            same = false;
+            break;
+          }
+        }
+        if (same) {
+          took = size;
+          break;
+        }
+      }
+      if (!took) return 0;
+      index += took;
+      chunks += 1;
+    }
+    return chunks;
+  };
+  for (let length = words.length - 1; length >= 2; length -= 1) {
+    const hypothesis = words.slice(words.length - length);
+    const chunks = canExplain(hypothesis);
+    if (chunks > 1) return hypothesis.join(" ");
+  }
+  return words.join(" ");
 }
 
 export function cleanName(input: string): string {
@@ -178,7 +281,9 @@ export function bulletsFromNotes(notes: string): string[] {
 export function normalizeParsed(raw: unknown, transcript: string): ParsedLead {
   const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   let name = typeof obj.name === "string" ? cleanName(obj.name) : "";
-  const phone = (typeof obj.phone === "string" ? cleanPhone(obj.phone) : "") || extractIndianMobile(transcript);
+  const fromSpeech = extractIndianMobile(transcript);
+  const fromModel = typeof obj.phone === "string" ? cleanPhone(obj.phone) : "";
+  const phone = fromSpeech || fromModel;
   if (name && cleanPhone(name) === phone && phone) name = "";
   const schoolName =
     typeof obj.school_name === "string"
@@ -186,7 +291,12 @@ export function normalizeParsed(raw: unknown, transcript: string): ParsedLead {
       : typeof obj.schoolName === "string"
         ? cleanName(obj.schoolName)
         : "";
-  const bullets = parseBullets(obj.requirements_summary ?? obj.bullets);
+  const summary = obj.requirements_summary ?? obj.bullets;
+  const bullets = parseBullets(summary).length
+    ? parseBullets(summary)
+    : typeof summary === "string"
+      ? bulletsFromNotes(summary.replace(/[.!?]\s+/g, "\n"))
+      : [];
   const objective =
     normalizeObjective(typeof obj.detected_objective === "string" ? obj.detected_objective : "") ||
     "Know More";
@@ -294,7 +404,7 @@ export function thankYouEmailHtml(input: {
         <td align="center" style="padding:32px 16px;">
           <table role="presentation" width="100%" style="max-width:480px;">
             <tr>
-              <td style="font-family:Arial,sans-serif;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#8493a3;">VidyaConnect</td>
+              <td style="font-family:Arial,sans-serif;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#150089;">OriginBI</td>
             </tr>
             <tr>
               <td style="padding-top:16px;font-size:28px;line-height:1.2;">Thank you, ${name}.</td>

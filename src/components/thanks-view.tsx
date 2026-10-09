@@ -17,11 +17,6 @@ export function ThanksView({ name, mail }: { name: string; mail: "sent" | "skipp
         {mail === "sent" ? (
           <p className="mt-3 text-sm text-subtle">A thank-you note is on its way to your email.</p>
         ) : null}
-        {mail === "skipped" ? (
-          <p className="mt-3 text-sm text-subtle">
-            Saved. Email delivery isn't connected on this deployment, so no message was sent.
-          </p>
-        ) : null}
         <Link
           to="/"
           className="press mt-8 inline-flex h-12 items-center justify-center rounded-full bg-accent px-6 text-base font-medium text-accent-fg"
