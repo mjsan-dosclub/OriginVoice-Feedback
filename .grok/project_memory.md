@@ -1,0 +1,2 @@
+- Built standalone SPA CodeBite at artifacts/codebite/ (index.html, styles.css, app.js). [2026-09-26]
+- App uses localStorage key codebite_v1; Tailwind + jQuery + canvas-confetti CDNs. [2026-09-26]

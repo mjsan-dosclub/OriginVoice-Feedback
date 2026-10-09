@@ -1,0 +1,1 @@
+import{c as e}from"./createLucideIcon-C7gjo701.js";var t=e();function n({className:e}){return(0,t.jsx)(`img`,{src:`/origin-logo.png`,alt:`Origin BI, Beyond Intelligence`,className:e})}export{n as t};

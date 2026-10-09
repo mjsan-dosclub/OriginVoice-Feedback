@@ -1,0 +1,1 @@
+import{c as e}from"./createLucideIcon-C7gjo701.js";import{t}from"./capture-page-BBzvcyCj.js";var n=e();function r(){return(0,n.jsx)(t,{initialMode:`voice`})}export{r as component};

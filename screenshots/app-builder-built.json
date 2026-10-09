@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "VidyaConnect",
+      "hasCanvas": false,
+      "bodyTextLen": 565,
+      "bodyTextHash": "bfd50083e51fbbd5849f985343bef1aab28f986ba1ca4cd2b53a17ea40150ee7",
+      "bodyTextPrefix": "VidyaConnect Desk A minute with the booth. Speak it, or write it",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "VidyaConnect",
+      "hasCanvas": false,
+      "bodyTextLen": 368,
+      "bodyTextHash": "f6d1ec4aecc7b8c63f305d1275c590698dfedec9bc8d20de9f8b535089057639",
+      "bodyTextPrefix": "VidyaConnect Desk A minute with the booth. Speak it, or write it",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}
