@@ -132,6 +132,17 @@ export const listLeads = createServerFn({ method: "GET" }).handler(async () => {
   return listLeadState();
 });
 
+export const deleteLeads = createServerFn({ method: "POST" })
+  .validator((input: { ids: string[] }) => {
+    const data = record(input);
+    const raw = Array.isArray(data.ids) ? data.ids : [];
+    return { ids: raw.slice(0, 200).map((id) => text(id, 80)) };
+  })
+  .handler(async ({ data }) => {
+    const { deleteLeadState } = await import("./leads.server");
+    return deleteLeadState(data);
+  });
+
 export const setBoothCode = createServerFn({ method: "POST" })
   .validator((input: { code: string }) => {
     const data = record(input);

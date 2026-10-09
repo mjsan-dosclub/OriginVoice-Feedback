@@ -575,6 +575,20 @@ export async function listLeadState() {
   return { ok: true as const, leads: rows.map(mapLead) };
 }
 
+export async function deleteLeadState(input: { ids: string[] }) {
+  const session = await requireAdmin();
+  if (!session) return { ok: false as const, error: "Sign in to the booth desk." };
+  const ids = [...new Set(input.ids.map((id) => id.trim()).filter((id) => /^[a-zA-Z0-9-]{8,80}$/.test(id)))].slice(0, 200);
+  if (!ids.length) return { ok: false as const, error: "Choose at least one enquiry." };
+  const sql = await getSql();
+  const placeholders = ids.map((_, index) => `$${index + 1}`).join(", ");
+  const rows = await sql.query<{ id: string }>(
+    `delete from leads where id in (${placeholders}) returning id`,
+    ids,
+  );
+  return { ok: true as const, deleted: rows.length };
+}
+
 export async function changeBoothCode(input: { code: string }) {
   const session = await requireAdmin();
   if (!session) return { ok: false as const, error: "Sign in to the booth desk." };

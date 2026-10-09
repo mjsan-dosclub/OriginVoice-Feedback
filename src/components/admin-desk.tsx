@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
-import { Download, Loader2, Radio } from "lucide-react";
+import { Download, Loader2, Radio, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
 import { OriginLogo } from "@/components/mark";
@@ -10,6 +10,7 @@ import {
   adminLogin,
   adminLogout,
   listLeads,
+  deleteLeads,
   seedSampleLeads,
   setBoothCode,
 } from "@/lib/leads.functions";
@@ -51,6 +52,9 @@ export function AdminDesk() {
   const [nextCode, setNextCode] = useState("");
   const [codeMessage, setCodeMessage] = useState("");
   const [sampleMessage, setSampleMessage] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const known = useRef<Set<string> | null>(null);
 
   async function refresh() {
@@ -133,6 +137,52 @@ export function AdminDesk() {
       }),
     [leads, objective, slot, status],
   );
+
+  const selectedIds = leads.map((lead) => lead.id).filter((id) => selected.has(id));
+  const shownIds = filtered.map((lead) => lead.id);
+  const allShown = shownIds.length > 0 && shownIds.every((id) => selected.has(id));
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleShown() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allShown) shownIds.forEach((id) => next.delete(id));
+      else shownIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
+  async function removeSelected() {
+    if (!selectedIds.length || deleting) return;
+    const count = selectedIds.length;
+    const label = count === 1 ? "this enquiry" : `${count} enquiries`;
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const result = await deleteLeads({ data: { ids: selectedIds } });
+      if (!result.ok) {
+        setDeleteError(result.error);
+        return;
+      }
+      const gone = new Set(selectedIds);
+      setLeads((prev) => prev.filter((lead) => !gone.has(lead.id)));
+      setSelected(new Set());
+      setAnnounce(`${result.deleted} ${result.deleted === 1 ? "enquiry" : "enquiries"} deleted`);
+    } catch {
+      setDeleteError("Couldn't delete those enquiries. Try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function onLogin(event: FormEvent) {
     event.preventDefault();
@@ -237,6 +287,31 @@ export function AdminDesk() {
 
       {loadError ? <p className="mt-4 text-sm text-danger">{loadError}</p> : null}
 
+      {loaded && leads.length > 0 ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              className="size-4 accent-fg"
+              checked={allShown}
+              onChange={toggleShown}
+              disabled={filtered.length === 0}
+            />
+            Select all shown
+          </label>
+          <Button
+            variant="outline"
+            className="text-danger"
+            disabled={selectedIds.length === 0 || deleting}
+            onClick={() => void removeSelected()}
+          >
+            {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+            Delete selected{selectedIds.length ? ` (${selectedIds.length})` : ""}
+          </Button>
+        </div>
+      ) : null}
+      {deleteError ? <p className="mt-2 text-sm text-danger">{deleteError}</p> : null}
+
       {!loaded ? (
         <p className="mt-8 text-sm text-muted">Opening the queue…</p>
       ) : leads.length === 0 ? (
@@ -278,12 +353,21 @@ export function AdminDesk() {
               )}
             >
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 size-4 shrink-0 accent-fg"
+                    checked={selected.has(lead.id)}
+                    aria-label={`Select ${lead.name || "unnamed enquiry"}`}
+                    onChange={() => toggleOne(lead.id)}
+                  />
+                  <div>
                   <p className="text-xs tracking-widest text-subtle uppercase">
                     {lead.mode === "voice" ? "Voice" : "Form"}
                   </p>
                   <h2 className="mt-1 text-lg font-medium">{lead.name || "Unnamed voice note"}</h2>
                   <p className="text-sm text-muted">{lead.schoolName || "Institution not captured"}</p>
+                  </div>
                 </div>
                 <p className="text-xs text-subtle tabular-nums">{when(lead.createdAt)}</p>
               </div>
