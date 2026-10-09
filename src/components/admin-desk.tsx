@@ -55,6 +55,7 @@ export function AdminDesk() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const known = useRef<Set<string> | null>(null);
 
   async function refresh() {
@@ -162,11 +163,9 @@ export function AdminDesk() {
 
   async function removeSelected() {
     if (!selectedIds.length || deleting) return;
-    const count = selectedIds.length;
-    const label = count === 1 ? "this enquiry" : `${count} enquiries`;
-    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
     setDeleting(true);
     setDeleteError("");
+    setConfirmDelete(false);
     try {
       const result = await deleteLeads({ data: { ids: selectedIds } });
       if (!result.ok) {
@@ -299,15 +298,32 @@ export function AdminDesk() {
             />
             Select all shown
           </label>
-          <Button
-            variant="outline"
-            className="text-danger"
-            disabled={selectedIds.length === 0 || deleting}
-            onClick={() => void removeSelected()}
-          >
-            {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-            Delete selected{selectedIds.length ? ` (${selectedIds.length})` : ""}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {confirmDelete && selectedIds.length > 0 ? (
+              <>
+                <p className="text-sm text-danger">
+                  Delete {selectedIds.length === 1 ? "this enquiry" : `${selectedIds.length} enquiries`}? This cannot be undone.
+                </p>
+                <Button variant="outline" className="text-danger" disabled={deleting} onClick={() => void removeSelected()}>
+                  {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                  Delete
+                </Button>
+                <Button variant="ghost" disabled={deleting} onClick={() => setConfirmDelete(false)}>
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                className="text-danger"
+                disabled={selectedIds.length === 0 || deleting}
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 className="size-4" />
+                Delete selected{selectedIds.length ? ` (${selectedIds.length})` : ""}
+              </Button>
+            )}
+          </div>
         </div>
       ) : null}
       {deleteError ? <p className="mt-2 text-sm text-danger">{deleteError}</p> : null}

@@ -57,6 +57,7 @@ export function VoicePanel() {
   const prefixRef = useRef("");
   const transcriptRef = useRef("");
   const interimRef = useRef("");
+  const finalsHold = useRef("");
   const clientKey = useRef<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -102,8 +103,12 @@ export function VoicePanel() {
     recognition.onresult = (event) => {
       heardRef.current = true;
       const { finals, interim: nextInterim } = sessionText(event.results);
-      remember(joinSpeech(prefixRef.current, finals));
+      finalsHold.current = finals;
       interimRef.current = nextInterim;
+      const committed = joinSpeech(prefixRef.current, finals);
+      const shown = nextInterim.trim() ? `${committed} ${nextInterim.trim()}`.trim() : committed;
+      transcriptRef.current = shown;
+      setTranscript(shown);
       setInterim(nextInterim);
     };
     recognition.onerror = (event) => {
@@ -118,11 +123,14 @@ export function VoicePanel() {
       }
     };
     recognition.onend = () => {
-      prefixRef.current = transcriptRef.current.trim();
-      if (!wantRef.current) {
-        setInterim("");
-        return;
-      }
+      const pending = interimRef.current.trim();
+      const committed = joinSpeech(prefixRef.current, finalsHold.current);
+      prefixRef.current = pending ? `${committed} ${pending}`.trim() : committed;
+      finalsHold.current = "";
+      interimRef.current = "";
+      transcriptRef.current = prefixRef.current;
+      setTranscript(prefixRef.current);
+      setInterim("");
       window.setTimeout(() => {
         if (!wantRef.current) return;
         try {
@@ -146,7 +154,9 @@ export function VoicePanel() {
     const recorder = recorderRef.current;
     if (!recorder || recorder.state === "inactive") return Promise.resolve<Blob | null>(null);
     return new Promise<Blob | null>((resolve) => {
+      const timer = window.setTimeout(() => resolve(null), 2000);
       recorder.onstop = () => {
+        window.clearTimeout(timer);
         const type = recorder.mimeType || "audio/mp4";
         const blob = new Blob(chunksRef.current, { type });
         resolve(blob.size ? blob : null);
@@ -154,6 +164,7 @@ export function VoicePanel() {
       try {
         recorder.stop();
       } catch {
+        window.clearTimeout(timer);
         resolve(null);
       }
     });
@@ -200,6 +211,10 @@ export function VoicePanel() {
     }
 
     const recognition = ensureRecognition();
+    if (limitRef.current) window.clearTimeout(limitRef.current);
+    limitRef.current = window.setTimeout(() => {
+      if (wantRef.current) void stopListening();
+    }, MAX_RECORD_MS);
     if (recognition) {
       recognition.lang = "en-IN";
       try {
@@ -207,21 +222,15 @@ export function VoicePanel() {
       } catch {
         /* already started */
       }
-    } else {
-      setRecorderOnly(true);
+      return;
     }
 
-    if (limitRef.current) window.clearTimeout(limitRef.current);
-    limitRef.current = window.setTimeout(() => {
-      if (wantRef.current) void stopListening();
-    }, MAX_RECORD_MS);
+    setRecorderOnly(true);
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      if (!recognition) {
-        wantRef.current = false;
-        setListening(false);
-        setSpeechError("This phone has no voice capture. Type the note, or use Manual form.");
-      }
+      wantRef.current = false;
+      setListening(false);
+      setSpeechError("This phone has no voice capture. Type the note, or use Manual form.");
       return;
     }
 
@@ -246,11 +255,9 @@ export function VoicePanel() {
         recorderRef.current = recorder;
       })
       .catch(() => {
-        if (!recognition) {
-          wantRef.current = false;
-          setListening(false);
-          setSpeechError("Microphone is blocked. Type the note, or use Manual form.");
-        }
+        wantRef.current = false;
+        setListening(false);
+        setSpeechError("Microphone is blocked. Type the note, or use Manual form.");
       });
   }
 
@@ -391,8 +398,12 @@ export function VoicePanel() {
         <Textarea
           value={transcript}
           onChange={(event) => {
-            remember(event.target.value);
-            prefixRef.current = event.target.value;
+            const value = event.target.value;
+            transcriptRef.current = value;
+            prefixRef.current = value;
+            finalsHold.current = "";
+            interimRef.current = "";
+            setTranscript(value);
           }}
           placeholder="Your words appear here. Edit a name, institution, or number before processing."
           aria-label="Live transcript"

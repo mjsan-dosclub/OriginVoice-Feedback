@@ -214,6 +214,7 @@ async function callGrok(transcript: string, withSchema: boolean) {
   const hint = extractIndianMobile(transcript);
   const res = await fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
+    signal: AbortSignal.timeout(20_000),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
@@ -309,6 +310,7 @@ export async function transcribeBoothAudio(input: { audioBase64: string; mime: s
   try {
     const res = await fetch("https://api.x.ai/v1/stt", {
       method: "POST",
+      signal: AbortSignal.timeout(25_000),
       headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
     });
